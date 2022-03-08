@@ -1,15 +1,14 @@
 use std::net::{UdpSocket, Ipv4Addr};
 use clap::Parser;
-use dhcp4r::server;
+
+use crate::spoofer::Spoofer;
 
 mod spoofer;
-
-const SERVER_IP: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 76);//this is the actual ip the server will to
 
 fn main() -> std::io::Result<()> {
     let args = dhcp_spoofer::Args::parse();
 
-    println!("Spinning up phoney DHCP service to assign IP : {}", args.address);
+    println!("Spinning up phoney DHCP service to assign IP : {}", args.assign);
     println!("Opening socket to listen for DHCP Discover messages...");
 
     let socket = UdpSocket::bind("0.0.0.0:67")?;
@@ -17,7 +16,9 @@ fn main() -> std::io::Result<()> {
 
     let spoofer = spoofer::Spoofer::new(args);
 
-    server::Server::serve(socket, SERVER_IP, spoofer);
-
+    let mut buffer = [0; 1000];
+    let (num_bytes, src_addr) = socket.recv_from(&mut buffer).expect("couldnt read");
+    let msg = Spoofer::decode_message(&buffer);
+    
     Ok(())
 }
