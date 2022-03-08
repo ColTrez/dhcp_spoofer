@@ -4,7 +4,7 @@ use dhcp4r::server;
 
 mod spoofer;
 
-const SERVER_IP: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 76);//this is the actual ip the server will to
+const SERVER_IP: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 76);//this is the actual ip the server will to
 
 fn main() -> std::io::Result<()> {
     let args = dhcp_spoofer::Args::parse();

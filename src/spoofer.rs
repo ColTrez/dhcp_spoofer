@@ -22,6 +22,7 @@ impl server::Handler for Spoofer {
     fn handle_request(&mut self, server: &server::Server, in_packet: dhcp4r::packet::Packet) {
         match in_packet.message_type() {
             Ok(MessageType::Discover) => {
+                println!("Received a DHCP Discover message...");
                 //assign the ip to the client
                 //reply(server, options::MessageType::Offer, in_packet, self.address_to_assign)
                 let result = server.reply(
@@ -33,7 +34,7 @@ impl server::Handler for Spoofer {
                     self.address_to_assign,
                     in_packet,
                 );
-                if let Err(_) = result {println!("Error handling Discover message")};
+                if let Err(err) = result {println!("Error handling Discover message: {:?}", err)};
             }
             Ok(MessageType::Request) => {
                 let requested_ip = match in_packet.option(REQUESTED_IP_ADDRESS) {
@@ -41,6 +42,7 @@ impl server::Handler for Spoofer {
                     _ => in_packet.ciaddr,
                 };
                 if requested_ip == self.address_to_assign {
+                    println!("Success! Client has requested ip {}", self.address_to_assign);
                     let result = server.reply(
                         MessageType::Ack,
                         vec![
@@ -53,7 +55,7 @@ impl server::Handler for Spoofer {
                 }
                 else {
                     //client has requested something other than what we're trying to assign
-                    print!("The client requested ip {}, which is not what we're trying to assign. Assignment failed.", self.address_to_assign);
+                    println!("The client requested ip {}, which is not what we're trying to assign. Assignment failed.", self.address_to_assign);
                     let result = server.reply(MessageType::Nak,vec![options::Message("That IP is not available.".into())], Ipv4Addr::new(0, 0, 0, 0), in_packet);
                     if let Err(_) = result {println!("Error handling Request message for an ip other than the assigned")};
                 }
