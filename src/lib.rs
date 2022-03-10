@@ -22,6 +22,7 @@ pub struct Args {
 pub enum SpooferError {
     IO(io::Error),
     Decode(dhcproto::v4::DecodeError),
+    Encode(dhcproto::v4::EncodeError),
     NoDhcpType,
     OtherError(),
 }
@@ -35,5 +36,11 @@ impl From<io::Error> for SpooferError {
 impl From<dhcproto::v4::DecodeError> for SpooferError {
     fn from(err: dhcproto::v4::DecodeError) -> SpooferError {
         SpooferError::Decode(err)
+    }
+}
+
+impl From<dhcproto::v4::EncodeError> for SpooferError {
+    fn from(err: dhcproto::v4::EncodeError) -> SpooferError {
+        SpooferError::Encode(err)
     }
 }
