@@ -85,9 +85,13 @@ impl Spoofer {
 
     fn make_offer(&self, msg : dhcp::Message) -> Result<dhcp::Message, SpooferError> {
         let mut offer = dhcp::Message::default();
-        
+
+        //chaddr may need to be padded w/ 0's if its not long enough
+        let mut chaddr_bytes = [0; 16];//it needs to be 16 bytes long
+        chaddr_bytes[..msg.chaddr().len()].copy_from_slice(msg.chaddr());
+
         offer.set_flags(dhcp::Flags::default().set_broadcast())
-            .set_chaddr(msg.chaddr())
+            .set_chaddr(&chaddr_bytes)
             .set_yiaddr(self.assign)
             .set_siaddr(self.server_address)
             .opts_mut()
