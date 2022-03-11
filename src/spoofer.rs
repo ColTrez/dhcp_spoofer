@@ -34,7 +34,8 @@ impl Spoofer {
                     let mut outgoingMessage = Vec::new();
                     let mut e = Encoder::new(&mut outgoingMessage);
                     msg.encode(&mut e)?;
-                    socket.send_to(&outgoingMessage, "255.255.255.255")?;
+                    println!("offering ip");
+                    socket.send_to(&outgoingMessage, "255.255.255.255:67")?;
                 },
                 Ok(None) => {},
                 Err(e) => return Err(e),
@@ -71,7 +72,7 @@ impl Spoofer {
                 Ok(None)
             },
             Some(other_message) => {
-                println!("Received some unimplemented DHCP message");
+                println!("Received some unimplemented DHCP message of type {:?}", other_message);
 
                 Ok(None)
             },
